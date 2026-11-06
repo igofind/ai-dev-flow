@@ -12,7 +12,7 @@ import {
   type ToolHandlers,
 } from "./tools.ts"
 import { createTask, loadTask, newTaskID, saveTask } from "./state.ts"
-import { crossCheckTests, readEvidence } from "./evidence.ts"
+import { clearEvidence, crossCheckTests, readEvidence } from "./evidence.ts"
 import { taskDir, writeDraft } from "./drafts.ts"
 
 type Deps = {
@@ -42,16 +42,17 @@ export function createHandlers({ ctx, session, log }: Deps): ToolHandlers {
       if (!workdir) throw new Error("读不到会话工作目录。")
 
       const existing = await loadTask(ctx, root)
+      const reused = existing && existing.state !== "closed" ? existing : undefined
       const task =
-        existing && existing.state !== "closed"
-          ? existing
-          : createTask({
-              id: newTaskID(),
-              sessionID: root,
-              title: String(input?.task ?? "").trim() || "未命名任务",
-              workdir,
-              dir: "",
-            })
+        reused ??
+        createTask({
+          id: newTaskID(),
+          sessionID: root,
+          title: String(input?.task ?? "").trim() || "未命名任务",
+          workdir,
+          dir: "",
+        })
+      if (!reused) await clearEvidence(ctx, root)
       const dir = taskDir(workdir, task.id)
       const version = task.analysisVersion + 1
       const filePath = writeDraft(

@@ -147,4 +147,10 @@ describe("答复等待器", () => {
     expect(waiter.settle("f1", { confirm: "yes" })).toBe(true)
     expect(waiter.settle("f1", { confirm: "cancel" })).toBe(false)
   })
+
+  test("等待超时返回 timedOut 标记", async () => {
+    const waiter = createCardWaiter()
+    const answer = await waiter.wait("f1", 10)
+    expect(answer).toEqual({ cancelled: true, timedOut: true })
+  })
 })

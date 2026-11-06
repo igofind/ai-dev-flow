@@ -54,12 +54,25 @@ export async function readEvidence(ctx: any, sessionID: string): Promise<Evidenc
   return Array.isArray(value) ? (value as EvidenceEntry[]) : []
 }
 
+// 按 ctx 和会话串行化证据写入，避免并发 read-modify-write 丢记录。
+const writeQueues = new WeakMap<object, Map<string, Promise<void>>>()
+
 // 按会话追加一条工具事件证据。
 export async function recordToolEvent(ctx: any, sessionID: string, event: any, now = Date.now()): Promise<void> {
   if (!sessionID) return
-  const entries = await readEvidence(ctx, sessionID)
-  entries.push(entryFromEvent(event, now))
-  await ctx.storage.set(evidenceKey(sessionID), entries)
+  let queues = writeQueues.get(ctx)
+  if (!queues) {
+    queues = new Map()
+    writeQueues.set(ctx, queues)
+  }
+  const previous = queues.get(sessionID) ?? Promise.resolve()
+  const next = previous.then(async () => {
+    const entries = await readEvidence(ctx, sessionID)
+    entries.push(entryFromEvent(event, now))
+    await ctx.storage.set(evidenceKey(sessionID), entries)
+  })
+  queues.set(sessionID, next.catch(() => {}))
+  await next
 }
 
 // 清空会话的证据记录。

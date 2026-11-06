@@ -65,6 +65,16 @@ describe("证据存取", () => {
     expect(await readEvidence(ctx, "s2")).toEqual([])
   })
 
+  test("并发写入不丢记录", async () => {
+    const ctx = fakeCtx()
+    await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        recordToolEvent(ctx, "s1", { tool: "read", input: { path: `a${index}.ts` }, status: "completed" }, index),
+      ),
+    )
+    expect((await readEvidence(ctx, "s1")).length).toBe(10)
+  })
+
   test("没有会话 ID 时不写入", async () => {
     const ctx = fakeCtx()
     await recordToolEvent(ctx, "", { tool: "read", input: {}, status: "completed" })

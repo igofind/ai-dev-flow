@@ -37,7 +37,13 @@ export async function registerConfirm({ ctx, session, cards, waiter, log }: Deps
         if (!formID) throw new Error("卡片没有弹出来（读不到本机服务）。")
         const answer = await waiter.wait(formID)
         if (!answer) throw new Error("卡片没有返回答复。")
-        if (answer.cancelled) return { content: "卡片被关掉了，任务仍停在待确认。要执行就重新调用 flow_confirm。" }
+        if (answer.cancelled) {
+          return {
+            content: answer.timedOut
+              ? "卡片等待超时，任务仍停在待确认。要执行就重新调用 flow_confirm。"
+              : "卡片被关掉了，任务仍停在待确认。要执行就重新调用 flow_confirm。",
+          }
+        }
 
         const verdict = classifyAnswer(String(answer.confirm ?? ""))
         if (verdict.kind === "invalid") throw new Error("卡片没有返回有效答复。")

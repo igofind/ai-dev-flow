@@ -127,20 +127,32 @@ export function createCards(service: CardService | undefined, fetcher: Fetcher =
   return { create, cancel }
 }
 
+// 卡片等待的默认超时：10 分钟。
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
+
 /** 卡片答复可能比等待先到，所以先存后取 */
 export function createCardWaiter() {
   const waiters = new Map<string, (answer: any) => void>()
   const settled = new Map<string, any>()
   const handled = new Set<string>()
 
-  // 等待某张卡片的答复。
-  function wait(formID: string): Promise<any | undefined> {
+  // 等待某张卡片的答复；超时返回 timedOut 标记。
+  function wait(formID: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<any | undefined> {
     const done = settled.get(formID)
     if (done) {
       settled.delete(formID)
       return Promise.resolve(done)
     }
-    return new Promise((resolve) => waiters.set(formID, resolve))
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        waiters.delete(formID)
+        resolve({ cancelled: true, timedOut: true })
+      }, timeoutMs)
+      waiters.set(formID, (answer) => {
+        clearTimeout(timer)
+        resolve(answer)
+      })
+    })
   }
 
   // 把答复交给等待者；如果还没人等，就先存起来。
