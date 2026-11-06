@@ -2,6 +2,7 @@
 
 import type { Task } from "./state.ts"
 
+// 注入给模型的流程规则文本。
 export const RULES_TEXT = `## ai-dev-flow
 - 变更类任务先调用 flow_submit_analysis；贴出稿件链接后调用 flow_confirm 弹第 1 张卡。
 - 理解确认后调用 flow_submit_plan；贴出链接后调用 flow_confirm 弹第 2 张卡。清单确认后按清单自主执行。
@@ -10,6 +11,7 @@ export const RULES_TEXT = `## ai-dev-flow
 - 收尾调用 flow_finish，按证据核对交付说明。
 - 确认前只读；写操作会被记录，请等两张卡都确认后再写。`
 
+// 六个任务状态的中文标签。
 const LABEL: Record<Task["state"], string> = {
   analyzing: "理解中",
   awaiting_analysis: "待确认理解",
@@ -19,6 +21,7 @@ const LABEL: Record<Task["state"], string> = {
   closed: "已结束",
 }
 
+// 按任务状态生成一行状态提示；没有任务时提示先提交理解稿。
 export function statusLine(task: Task | undefined): string {
   if (!task) return "当前没有任务；问答和只读直接回答，变更类先调用 flow_submit_analysis。"
   const parts = [`任务 ${task.id}「${task.title}」${LABEL[task.state]}`]

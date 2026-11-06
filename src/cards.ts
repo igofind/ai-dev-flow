@@ -6,10 +6,13 @@ import os from "node:os"
 import path from "node:path"
 import type { Task } from "./state.ts"
 
+// 卡片服务的地址与鉴权。
 export type CardService = { url: string; auth: string }
 
+// 卡片的一个可选项。
 export type CardOption = { value: string; label: string; description: string }
 
+// 一张卡片的规格：标题、问题、说明和选项。
 export type CardSpec = {
   title: string
   question: string
@@ -17,17 +20,21 @@ export type CardSpec = {
   options: CardOption[]
 }
 
+// 卡片答复的分类和备注。
 export type Answer = { kind: "confirm" | "cancel" | "revise" | "invalid"; note: string }
 
+// 确认卡的两个选项：确认和取消任务。
 export const CONFIRM_OPTIONS: CardOption[] = [
   { value: "yes", label: "确认", description: "按这一稿继续" },
   { value: "cancel", label: "取消任务", description: "结束任务，不留授权" },
 ]
 
+// 截断文本，超出长度时加省略号。
 function clip(text: string, length: number): string {
   return text.length > length ? `${text.slice(0, length)}…` : text
 }
 
+// 把卡片原始答复分类成确认、取消、修正或无效。
 export function classifyAnswer(raw: string): Answer {
   const value = raw.trim()
   if (!value) return { kind: "invalid", note: "" }
@@ -36,6 +43,7 @@ export function classifyAnswer(raw: string): Answer {
   return { kind: "revise", note: value }
 }
 
+// 生成理解稿的确认卡。
 export function analysisCard(task: Task): CardSpec {
   const version = task.currentAnalysis?.version ?? task.analysisVersion
   return {
@@ -46,6 +54,7 @@ export function analysisCard(task: Task): CardSpec {
   }
 }
 
+// 生成任务清单的确认卡。
 export function planCard(task: Task): CardSpec {
   const version = task.currentPlan?.version ?? task.planVersion
   const files = new Set(task.items.flatMap((item) => item.files))
@@ -68,9 +77,12 @@ export function readService(): CardService | undefined {
   }
 }
 
+// 请求函数签名。
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 
+// 创建卡片服务客户端，提供建卡和撤卡。
 export function createCards(service: CardService | undefined, fetcher: Fetcher = fetch) {
+  // 创建一张卡片并返回卡片 ID。
   async function create(input: CardSpec & { sessionID: string }): Promise<string | undefined> {
     if (!service) return undefined
     try {
@@ -99,6 +111,7 @@ export function createCards(service: CardService | undefined, fetcher: Fetcher =
     }
   }
 
+  // 撤回一张还没答复的卡片。
   async function cancel(sessionID: string, formID: string): Promise<void> {
     if (!service) return
     try {
@@ -120,6 +133,7 @@ export function createCardWaiter() {
   const settled = new Map<string, any>()
   const handled = new Set<string>()
 
+  // 等待某张卡片的答复。
   function wait(formID: string): Promise<any | undefined> {
     const done = settled.get(formID)
     if (done) {
@@ -129,6 +143,7 @@ export function createCardWaiter() {
     return new Promise((resolve) => waiters.set(formID, resolve))
   }
 
+  // 把答复交给等待者；如果还没人等，就先存起来。
   function settle(formID: string, answer: any): boolean {
     if (handled.has(formID)) return false
     handled.add(formID)
@@ -142,6 +157,7 @@ export function createCardWaiter() {
     return true
   }
 
+  // 清空等待状态。
   function reset(): void {
     waiters.clear()
     settled.clear()

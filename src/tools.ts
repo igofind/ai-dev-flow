@@ -3,12 +3,15 @@
 import path from "node:path"
 import { transition, type Completion, type ItemStatus, type PlanItem, type Task } from "./state.ts"
 
+// 理解稿必须包含的六个字段。
 export const ANALYSIS_FIELDS = ["要做什么", "依据", "方法", "边界", "不做什么", "待确认"] as const
 
+// 找出理解稿里缺的字段。
 export function missingAnalysisFields(material: string): string[] {
   return ANALYSIS_FIELDS.filter((label) => !new RegExp(`(^|\\n)\\s*[-*]?\\s*${label}\\s*[：:]`).test(material))
 }
 
+// 把脚本路径规范成 tmp/ 下的纯文件名；不合法时返回 undefined。
 export function normalizeScript(raw: string): string | undefined {
   const value = String(raw ?? "").trim().replace(/^\.\/+/, "")
   if (!value) return undefined
@@ -19,6 +22,7 @@ export function normalizeScript(raw: string): string | undefined {
   return withoutTmp
 }
 
+// 把文件路径规范成会话目录内的相对路径；越界时返回 undefined。
 export function normalizeProjectFile(raw: string, workdir: string): string | undefined {
   const value = String(raw ?? "").trim()
   if (!value) return undefined
@@ -28,8 +32,10 @@ export function normalizeProjectFile(raw: string, workdir: string): string | und
   return path.relative(root, absolute)
 }
 
+// 规范化后的任务清单。
 export type NormalizedPlan = { items: Omit<PlanItem, "status">[]; scripts: string[] }
 
+// 校验并规范化清单输入；不合法时返回错误原因。
 export function normalizePlan(input: any, workdir: string): { ok: true; plan: NormalizedPlan } | { ok: false; error: string } {
   const rawItems = Array.isArray(input?.items) ? input.items : []
   if (rawItems.length === 0) return { ok: false, error: "任务清单至少要有一项。" }
@@ -81,6 +87,7 @@ export function normalizePlan(input: any, workdir: string): { ok: true; plan: No
   return { ok: true, plan: { items, scripts: [...scripts] } }
 }
 
+// 把清单渲染成可写入文件的 Markdown。
 export function renderPlanMaterial(items: Omit<PlanItem, "status">[], scripts: string[], summary: string): string {
   const lines: string[] = []
   if (summary.trim()) lines.push(summary.trim(), "")
@@ -98,12 +105,15 @@ export function renderPlanMaterial(items: Omit<PlanItem, "status">[], scripts: s
   return lines.join("\n")
 }
 
+// 生成稿件文件名。
 export function draftFileName(taskID: string, kind: "analysis" | "plan", version: number): string {
   return `${taskID}-${kind}-v${version}.md`
 }
 
+// 状态迁移结果：成功带新任务，失败带原因。
 export type ApplyResult = { ok: true; task: Task } | { ok: false; error: string }
 
+// 应用理解稿提交，把任务迁移到待确认理解。
 export function applySubmitAnalysis(
   task: Task,
   input: { path: string; version: number; now?: number },
@@ -123,6 +133,7 @@ export function applySubmitAnalysis(
   }
 }
 
+// 应用清单提交，把任务迁移到待确认清单。
 export function applySubmitPlan(
   task: Task,
   input: { path: string; version: number; plan: NormalizedPlan; now?: number },
@@ -144,6 +155,7 @@ export function applySubmitPlan(
   }
 }
 
+// 更新清单项状态或阻塞原因。
 export function applyProgress(
   task: Task,
   input: { itemID?: string; status?: ItemStatus; blockedOn?: Task["blockedOn"] | "none"; note?: string; now?: number },
@@ -175,6 +187,7 @@ export function applyProgress(
   return { ok: true, task: { ...task, blockedOn, updatedAt: now } }
 }
 
+// 写入交付总结并关闭任务。
 export function applyFinish(
   task: Task,
   input: { summary: string; changedFiles: string[]; tests: string[]; unfinished: string[]; now?: number },
@@ -193,6 +206,7 @@ export function applyFinish(
   return { ok: true, task: { ...closed.task, completion } }
 }
 
+// 四个流程工具的处理函数。
 export type ToolHandlers = {
   submitAnalysis: (input: any, context: any) => Promise<{ content: string }>
   submitPlan: (input: any, context: any) => Promise<{ content: string }>
@@ -200,6 +214,7 @@ export type ToolHandlers = {
   finish: (input: any, context: any) => Promise<{ content: string }>
 }
 
+// 把四个流程工具注册到 tool 编辑器。
 export async function registerTools(ctx: any, handlers: ToolHandlers): Promise<void> {
   await ctx.tool.transform((editor: any) => {
     editor.namespace({ name: "flow", description: "ai-dev-flow 的流程工具" })
